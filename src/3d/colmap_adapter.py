@@ -1,0 +1,1 @@
+# Parsers/adapters for COLMAP outputs
