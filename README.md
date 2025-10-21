@@ -5,15 +5,16 @@
 ## Quickstart
 
 - Create Conda environment:
-conda env create -f environment.yml
-conda activate hazardloc
+`conda env create -f environment.yml`
+`conda activate hazardloc`
 
 - Place images in `colmap/images/`
+  
 - Train/evaluate:  
-python src/train.py
-python src/evaluate.py
+`python src/train.py`
+`python src/evaluate.py`
 
 - Run full pipeline:  
-python src/main.py
+`python src/main.py`
 
 - See [docs/usage_guide.md](docs/usage_guide.md) for full details.
