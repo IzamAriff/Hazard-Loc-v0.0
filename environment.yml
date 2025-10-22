@@ -1,0 +1,23 @@
+name: hazardloc
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.11
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.1
+  - open3d
+  - opencv
+  - matplotlib
+  - numpy
+  - colmap
+  - pip
+  - pip:
+      - tqdm
+      - scikit-learn
+      - pandas
+      - PyYAML

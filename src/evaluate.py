@@ -1,1 +1,23 @@
 # Accuracy & performance metrics
+
+import torch
+from src.models.hazard_cnn import HazardCNN
+from src.data.dataloader import get_dataloaders
+from src.config import DATA_DIR, MODEL_SAVE
+
+def evaluate():
+    loaders = get_dataloaders(DATA_DIR)
+    model = HazardCNN(num_classes=2)
+    model.load_state_dict(torch.load(MODEL_SAVE, map_location='cpu'))
+    model.eval()
+    # Evaluate and print accuracy
+    correct, total = 0, 0
+    with torch.no_grad():
+        for images, targets in loaders['test']:
+            outputs = model(images)
+            _, preds = outputs.max(1)
+            correct += (preds == targets).sum().item()
+            total += targets.size(0)
+    print('Test accuracy:', correct/total)
+if __name__ == '__main__':
+    evaluate()

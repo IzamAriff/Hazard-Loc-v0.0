@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+env/
+hazardloc/
+# Data/logs
+data/*
+!data/.gitkeep
+results/*
+!results/.gitkeep
+colmap/database.db
+colmap/output/
