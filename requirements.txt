@@ -1,0 +1,28 @@
+# Python version
+python==3.11
+
+# PyTorch Stack (with CUDA 12.8 support)
+torch==2.0.1+cu118
+torchvision==0.15.2+cu118
+torchaudio==2.0.2+cu118
+# Install from PyTorch's official index
+--index-url https://download.pytorch.org/whl/cu118
+
+# CV / 3D Packages
+open3d
+opencv-python-headless
+colmap
+
+# Data Science & Utility Packages
+matplotlib
+numpy
+pandas
+scikit-learn
+tqdm
+pyyaml
+kaggle
+seaborn
+
+# Notebook / IDE
+jupyterlab
+ipykernel

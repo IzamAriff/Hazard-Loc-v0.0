@@ -1,14 +1,219 @@
-# End-to-end pipeline entrypoint
 
-from src.train import train
-from src.evaluate import evaluate
-from src.reconstruct import run_colmap_reconstruction
-from src.visualize import show_point_cloud
+"""
+HazardLoc: Complete Integration Pipeline
+Runs end-to-end workflow from 2D detection to 3D localization
+"""
+
+import torch
+import numpy as np
+from pathlib import Path
+import json
+
+# Import all modules
+from improved_dataloader import get_dataloaders
+from models.hazard_cnn import HazardCNN
+from enhanced_training import HazardTrainer
+from colmap_utils_module import COLMAPAdapter, read_colmap_outputs
+from backprojection_module import HazardLocalizer
+from open3d_viz_module import HazardVisualizer
+from detect import predict_img
+from config import DATA_DIR, MODEL_SAVE, COLMAP_IMG, COLMAP_OUT, VISUAL_DIR
+
+
+class HazardLocPipeline:
+    """
+    End-to-end pipeline for HazardLoc system
+    """
+
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = None
+        self.colmap = None
+        self.localizer = None
+        self.visualizer = None
+
+    def step1_train_detector(self, config=None):
+        """
+        Step 1: Train 2D hazard detection model
+        """
+        print("\n" + "="*70)
+        print("STEP 1: TRAINING 2D HAZARD DETECTION MODEL")
+        print("="*70)
+
+        if config is None:
+            config = {
+                'epochs': 30,
+                'batch_size': 32,
+                'learning_rate': 1e-3,
+                'patience': 10
+            }
+
+        # Load data
+        data = get_dataloaders(f"{DATA_DIR}/processed", batch_size=config['batch_size'])
+
+        # Create and train model
+        num_classes = len(data['class_names'])
+        self.model = HazardCNN(num_classes=num_classes)
+
+        criterion = torch.nn.CrossEntropyLoss(weight=data['class_weights'].to(self.device))
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config['learning_rate'])
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
+
+        trainer = HazardTrainer(self.model, self.device, config)
+        history = trainer.train(data['train'], data['val'], optimizer, criterion, scheduler)
+
+        print(f"\n✓ Model trained and saved to: {MODEL_SAVE}")
+        return history
+
+    def step2_run_colmap(self):
+        """
+        Step 2: Run COLMAP 3D reconstruction
+        """
+        print("\n" + "="*70)
+        print("STEP 2: COLMAP 3D RECONSTRUCTION")
+        print("="*70)
+
+        self.colmap = COLMAPAdapter(COLMAP_OUT, COLMAP_IMG)
+        success = self.colmap.run_full_pipeline()
+
+        if success:
+            print(f"\n✓ 3D reconstruction complete. Output: {COLMAP_OUT}")
+        else:
+            print("\n✗ COLMAP reconstruction failed")
+
+        return success
+
+    def step3_detect_hazards(self, test_images):
+        """
+        Step 3: Detect hazards in test images
+        """
+        print("\n" + "="*70)
+        print("STEP 3: DETECTING HAZARDS IN IMAGES")
+        print("="*70)
+
+        detections = []
+
+        for img_path in test_images:
+            label, confidence = predict_img(img_path)
+
+            if label == 1:  # Hazard detected (assuming 1 = hazard class)
+                detections.append({
+                    'image': img_path.name,
+                    'confidence': confidence,
+                    'bbox': [0, 0, 224, 224]  # Placeholder, needs object detection for real bbox
+                })
+                print(f"  ✓ Hazard detected in {img_path.name} (confidence: {confidence:.2%})")
+            else:
+                print(f"  - No hazard in {img_path.name}")
+
+        print(f"\nTotal hazards detected: {len(detections)}")
+        return detections
+
+    def step4_localize_3d(self, detections):
+        """
+        Step 4: Localize hazards in 3D space
+        """
+        print("\n" + "="*70)
+        print("STEP 4: LOCALIZING HAZARDS IN 3D")
+        print("="*70)
+
+        # Load COLMAP outputs
+        cameras, images, points3D = read_colmap_outputs(COLMAP_OUT)
+        self.localizer = HazardLocalizer(cameras, images, points3D)
+
+        hazard_3d_locations = []
+
+        for detection in detections:
+            loc_3d = self.localizer.localize_hazard(
+                detection['image'],
+                detection['bbox']
+            )
+
+            if loc_3d is not None:
+                hazard_3d_locations.append(loc_3d)
+                print(f"  ✓ {detection['image']}: 3D coords = {loc_3d}")
+            else:
+                print(f"  ✗ Failed to localize {detection['image']}")
+
+        print(f"\nSuccessfully localized {len(hazard_3d_locations)} hazards in 3D")
+        return hazard_3d_locations
+
+    def step5_visualize(self, hazard_locations):
+        """
+        Step 5: Visualize hazards in 3D point cloud
+        """
+        print("\n" + "="*70)
+        print("STEP 5: VISUALIZING 3D HAZARD MAP")
+        print("="*70)
+
+        self.visualizer = HazardVisualizer(COLMAP_OUT)
+        self.visualizer.load_point_cloud()
+
+        for loc in hazard_locations:
+            self.visualizer.add_hazard(loc)
+
+        # Save visualization
+        output_path = Path(VISUAL_DIR) / "hazard_map_3d.png"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self.visualizer.save_visualization(output_path)
+
+        print(f"\n✓ Visualization saved to: {output_path}")
+
+        # Interactive view
+        print("\nLaunching interactive 3D viewer...")
+        self.visualizer.visualize()
+
+    def run_complete_pipeline(self, skip_training=False, skip_colmap=False):
+        """
+        Execute complete HazardLoc pipeline
+        """
+        print("\n" + "="*70)
+        print("HAZARDLOC: COMPLETE PIPELINE EXECUTION")
+        print("="*70)
+
+        # Step 1: Train model (optional skip if already trained)
+        if not skip_training:
+            self.step1_train_detector()
+        else:
+            print("\nSkipping training (using existing model)")
+
+        # Step 2: COLMAP reconstruction (optional skip if already done)
+        if not skip_colmap:
+            self.step2_run_colmap()
+        else:
+            print("\nSkipping COLMAP (using existing reconstruction)")
+
+        # Step 3: Detect hazards
+        test_images = list(Path(COLMAP_IMG).glob("*.jpg"))[:10]  # Test on first 10 images
+        detections = self.step3_detect_hazards(test_images)
+
+        # Step 4: Localize in 3D
+        if len(detections) > 0:
+            hazard_locations = self.step4_localize_3d(detections)
+
+            # Step 5: Visualize
+            if len(hazard_locations) > 0:
+                self.step5_visualize(hazard_locations)
+        else:
+            print("\nNo hazards detected. Skipping 3D localization.")
+
+        print("\n" + "="*70)
+        print("PIPELINE COMPLETE!")
+        print("="*70)
+
 
 def main():
-    train()
-    evaluate()
-    run_colmap_reconstruction()
-    show_point_cloud()
+    """
+    Main entry point
+    """
+    pipeline = HazardLocPipeline()
+
+    # Run with options
+    pipeline.run_complete_pipeline(
+        skip_training=False,  # Set to True if model already trained
+        skip_colmap=False     # Set to True if COLMAP already run
+    )
+
+
 if __name__ == '__main__':
     main()
