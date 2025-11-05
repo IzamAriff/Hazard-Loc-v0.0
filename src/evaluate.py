@@ -8,7 +8,8 @@ from src.config import DATA_DIR, MODEL_SAVE
 def evaluate():
     loaders = get_dataloaders(DATA_DIR)
     model = HazardCNN(num_classes=2)
-    model.load_state_dict(torch.load(MODEL_SAVE, map_location='cpu'))
+    checkpoint = torch.load(MODEL_SAVE, map_location='cpu', weights_only=False)
+    model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     # Evaluate and print accuracy
     correct, total = 0, 0

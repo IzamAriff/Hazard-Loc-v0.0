@@ -8,7 +8,8 @@ from src.config import MODEL_SAVE
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = HazardCNN(num_classes=2)
-model.load_state_dict(torch.load(MODEL_SAVE, map_location=device))
+checkpoint = torch.load(MODEL_SAVE, map_location=device, weights_only=False)
+model.load_state_dict(checkpoint['model_state_dict'])
 model = model.to(device).eval()
 
 def predict_img(image_path):

@@ -115,7 +115,7 @@ class HazardVisualizer:
 
     def load_point_cloud(self):
         """Load point cloud from COLMAP output"""
-        from colmap_utils_module import read_colmap_outputs
+        from src.utils.colmap_utils import read_colmap_outputs
 
         _, _, points3D = read_colmap_outputs(self.colmap_dir)
         self.point_cloud = create_point_cloud_from_colmap(points3D)

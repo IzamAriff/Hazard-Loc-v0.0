@@ -5,19 +5,18 @@ Includes modern training techniques: early stopping, learning rate scheduling, m
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.cuda.amp import GradScaler, autocast
+import torch.optim as optim; from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 import numpy as np
 import json
 from pathlib import Path
 from datetime import datetime
 
-from improved_dataloader import get_dataloaders
-from models.hazard_cnn import HazardCNN
-from utils.metrics import compute_metrics
-from utils.logger import TrainingLogger
-from config import DATA_DIR, MODEL_SAVE, PROJECT_ROOT
+from src.data.dataloader import get_dataloaders
+from src.models.hazard_cnn import HazardCNN
+from src.utils.metrics import compute_metrics
+from src.utils.logger import TrainingLogger
+from src.config import DATA_DIR, MODEL_SAVE, PROJECT_ROOT
 
 
 class HazardTrainer:
@@ -31,13 +30,13 @@ class HazardTrainer:
         self.config = config
 
         # Training components
-        self.scaler = GradScaler() if config.get('mixed_precision', True) else None
+        self.scaler = GradScaler() if config.get('mixed_precision', True) and self.device.type == 'cuda' else None
         self.best_val_loss = float('inf')
         self.patience_counter = 0
         self.history = {'train_loss': [], 'val_loss': [], 'val_acc': []}
 
         # Logger
-        self.logger = TrainingLogger(PROJECT_ROOT / 'results' / 'logs')
+        self.logger = TrainingLogger(Path(PROJECT_ROOT) / 'results' / 'logs')
 
     def train_epoch(self, dataloader, optimizer, criterion):
         """Train for one epoch"""
@@ -54,7 +53,7 @@ class HazardTrainer:
 
             # Mixed precision training
             if self.scaler:
-                with autocast():
+                with autocast(device_type=self.device.type):
                     outputs = self.model(images)
                     loss = criterion(outputs, labels)
 
@@ -187,7 +186,7 @@ def main():
         'batch_size': 32,
         'learning_rate': 1e-3,
         'weight_decay': 1e-4,
-        'patience': 10,
+        'patience': 5,
         'mixed_precision': True,
         'num_workers': 4
     }
@@ -233,8 +232,7 @@ def main():
         optimizer,
         mode='min',
         factor=0.5,
-        patience=5,
-        verbose=True
+        patience=5
     )
 
     # Trainer

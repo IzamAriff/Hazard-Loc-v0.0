@@ -89,7 +89,7 @@ def get_dataloaders(data_dir, batch_size=32, num_workers=4, augment=True):
     Returns:
         Dictionary with train/val/test dataloaders
     """
-    from augmentation_module import HazardAugmentation
+    from src.data.augmentation import HazardAugmentation
 
     data_path = Path(data_dir)
     augmenter = HazardAugmentation()
@@ -157,7 +157,7 @@ def get_dataloaders(data_dir, batch_size=32, num_workers=4, augment=True):
 
 if __name__ == '__main__':
     # Test dataloader
-    from config import DATA_DIR
+    from src.config import DATA_DIR
 
     loaders = get_dataloaders(DATA_DIR + '/processed', batch_size=16)
 

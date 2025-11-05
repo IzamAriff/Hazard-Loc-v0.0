@@ -7,17 +7,20 @@ Runs end-to-end workflow from 2D detection to 3D localization
 import torch
 import numpy as np
 from pathlib import Path
-import json
+import importlib
 
 # Import all modules
-from improved_dataloader import get_dataloaders
-from models.hazard_cnn import HazardCNN
-from enhanced_training import HazardTrainer
-from colmap_utils_module import COLMAPAdapter, read_colmap_outputs
-from backprojection_module import HazardLocalizer
-from open3d_viz_module import HazardVisualizer
-from detect import predict_img
-from config import DATA_DIR, MODEL_SAVE, COLMAP_IMG, COLMAP_OUT, VISUAL_DIR
+from src.data.dataloader import get_dataloaders
+from src.models.hazard_cnn import HazardCNN
+from src.train import HazardTrainer
+from src.utils.colmap_utils import COLMAPAdapter, read_colmap_outputs
+# Programmatic import to handle directory name starting with a number
+backproject_module = importlib.import_module("src.3d.backproject")
+HazardLocalizer = backproject_module.HazardLocalizer
+open3d_viz_module = importlib.import_module("src.3d.open3d_viz")
+HazardVisualizer = open3d_viz_module.HazardVisualizer
+from src.detect import predict_img
+from src.config import DATA_DIR, MODEL_SAVE, COLMAP_IMG, COLMAP_OUT, VISUAL_DIR
 
 
 class HazardLocPipeline:
@@ -45,7 +48,7 @@ class HazardLocPipeline:
                 'epochs': 30,
                 'batch_size': 32,
                 'learning_rate': 1e-3,
-                'patience': 10
+                'patience': 5
             }
 
         # Load data
