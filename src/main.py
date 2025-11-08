@@ -100,10 +100,19 @@ class HazardLocPipeline:
             label, confidence = predict_img(img_path)
 
             if label == 1:  # Hazard detected (assuming 1 = hazard class)
+                # --- IMPROVEMENT ---
+                # Instead of a fixed placeholder, use a bounding box that covers the entire image.
+                # This is a better temporary solution before implementing a real object detector.
+                # We get the image dimensions from the COLMAP camera data later, but for now,
+                # we can read the image to get its size.
+                from PIL import Image
+                with Image.open(img_path) as img:
+                    width, height = img.size
+
                 detections.append({
                     'image': img_path.name,
                     'confidence': confidence,
-                    'bbox': [0, 0, 224, 224]  # Placeholder, needs object detection for real bbox
+                    'bbox': [0, 0, width, height]
                 })
                 print(f"  ✓ Hazard detected in {img_path.name} (confidence: {confidence:.2%})")
             else:
@@ -121,7 +130,7 @@ class HazardLocPipeline:
         print("="*70)
 
         # Load COLMAP outputs
-        cameras, images, points3D = read_colmap_outputs(COLMAP_OUT)
+        cameras, images, points3D = read_colmap_outputs(COLMAP_OUT, COLMAP_IMG)
         self.localizer = HazardLocalizer(cameras, images, points3D)
 
         hazard_3d_locations = []
@@ -149,7 +158,7 @@ class HazardLocPipeline:
         print("STEP 5: VISUALIZING 3D HAZARD MAP")
         print("="*70)
 
-        self.visualizer = HazardVisualizer(COLMAP_OUT)
+        self.visualizer = HazardVisualizer(COLMAP_OUT, COLMAP_IMG)
         self.visualizer.load_point_cloud()
 
         for loc in hazard_locations:
@@ -182,12 +191,15 @@ class HazardLocPipeline:
 
         # Step 2: COLMAP reconstruction (optional skip if already done)
         if not skip_colmap:
-            self.step2_run_colmap()
+            success = self.step2_run_colmap()
+            if not success:
+                print("\nHalting pipeline due to COLMAP failure.")
+                return
         else:
             print("\nSkipping COLMAP (using existing reconstruction)")
 
         # Step 3: Detect hazards
-        test_images = list(Path(COLMAP_IMG).glob("*.jpg"))[:10]  # Test on first 10 images
+        test_images = list(Path(COLMAP_IMG).glob("*.jpg"))  # Process all images
         detections = self.step3_detect_hazards(test_images)
 
         # Step 4: Localize in 3D
@@ -213,8 +225,8 @@ def main():
 
     # Run with options
     pipeline.run_complete_pipeline(
-        skip_training=False,  # Set to True if model already trained
-        skip_colmap=False     # Set to True if COLMAP already run
+        skip_training=True,  # Set to True if model already trained
+        skip_colmap=True     # Set to True if COLMAP already run
     )
 
 

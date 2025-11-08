@@ -85,15 +85,20 @@ def create_hazard_map(point_cloud, hazard_locations, output_path):
     Create and save hazard visualization
     """
     vis = o3d.visualization.Visualizer()
-    vis.create_window(visible=False)
+    vis.create_window(window_name="Hazard Map Capture", width=1920, height=1080, visible=False)
 
     vis.add_geometry(point_cloud)
 
     for loc in hazard_locations:
-        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.1)
+        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=0.2)
         sphere.translate(loc)
         sphere.paint_uniform_color([1.0, 0.0, 0.0])
         vis.add_geometry(sphere)
+
+    # Update the renderer to process the geometries, then adjust the camera view.
+    # This sequence prevents the "SetViewPoint() failed" warning.
+    view_control = vis.get_view_control()
+    view_control.set_zoom(0.7)
 
     vis.poll_events()
     vis.update_renderer()
@@ -108,8 +113,9 @@ class HazardVisualizer:
     Complete visualization pipeline for HazardLoc
     """
 
-    def __init__(self, colmap_output_dir):
+    def __init__(self, colmap_output_dir, colmap_image_dir):
         self.colmap_dir = Path(colmap_output_dir)
+        self.colmap_image_dir = Path(colmap_image_dir)
         self.point_cloud = None
         self.hazard_locations = []
 
@@ -117,7 +123,7 @@ class HazardVisualizer:
         """Load point cloud from COLMAP output"""
         from src.utils.colmap_utils import read_colmap_outputs
 
-        _, _, points3D = read_colmap_outputs(self.colmap_dir)
+        _, _, points3D = read_colmap_outputs(self.colmap_dir, self.colmap_image_dir)
         self.point_cloud = create_point_cloud_from_colmap(points3D)
 
         print(f"Loaded point cloud with {len(self.point_cloud.points)} points")
