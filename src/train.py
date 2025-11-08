@@ -29,8 +29,24 @@ class HazardTrainer:
         self.device = device
         self.config = config
 
-        # Training components
-        self.scaler = GradScaler() if config.get('mixed_precision', True) and self.device.type == 'cuda' else None
+        # BF16 Mixed Precision Setup (as per dissertation Section 3.4.3.3)
+        self.use_bf16 = config.get('use_bf16', True) and torch.cuda.is_available()
+        
+        if self.use_bf16:
+            # Check if GPU supports BF16
+            if torch.cuda.get_device_capability()[0] >= 8:  # Ampere or newer
+                self.dtype = torch.bfloat16
+                print("✓ BF16 mixed precision enabled (native GPU support)")
+            else:
+                print("⚠ GPU does not support BF16, falling back to FP16")
+                self.dtype = torch.float16
+        else:
+            self.dtype = torch.float32
+        
+        # GradScaler only needed for FP16, not BF16
+        self.scaler = GradScaler('cuda') if (self.dtype == torch.float16) else None
+        
+        # Rest of init...
         self.best_val_loss = float('inf')
         self.patience_counter = 0
         self.history = {'train_loss': [], 'val_loss': [], 'val_acc': []}
@@ -51,18 +67,17 @@ class HazardTrainer:
 
             optimizer.zero_grad()
 
-            # Mixed precision training
-            if self.scaler:
-                with autocast(device_type=self.device.type):
-                    outputs = self.model(images)
-                    loss = criterion(outputs, labels)
-
+            # BF16/FP16 Mixed Precision Forward Pass
+            with autocast(device_type='cuda', dtype=self.dtype, enabled=self.use_bf16):
+                outputs = self.model(images)
+                loss = criterion(outputs, labels)
+            
+            # Backward pass with proper scaling
+            if self.scaler:  # Only for FP16
                 self.scaler.scale(loss).backward()
                 self.scaler.step(optimizer)
                 self.scaler.update()
-            else:
-                outputs = self.model(images)
-                loss = criterion(outputs, labels)
+            else:  # BF16 or FP32 - no scaling needed
                 loss.backward()
                 optimizer.step()
 
@@ -188,7 +203,9 @@ def main():
         'weight_decay': 1e-4,
         'patience': 5,
         'mixed_precision': True,
-        'num_workers': 4
+        'num_workers': 4,
+        'loss_alpha': 1.0,  # Focal loss weight
+        'loss_beta': 0.5    # Dice loss weight
     }
 
     print("="*60)
@@ -203,6 +220,9 @@ def main():
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+        capability = torch.cuda.get_device_capability(0)
+        print(f"Compute Capability: {capability[0]}.{capability[1]}")
+        print(f"BF16 Support: {'Yes' if capability[0] >= 8 else 'No (using FP16)'}")
 
     # Load data
     print(f"\nLoading data from: {DATA_DIR}/processed")
@@ -217,8 +237,13 @@ def main():
     model = HazardCNN(num_classes=num_classes)
     print(f"\nModel: HazardCNN with {num_classes} classes")
 
-    # Loss function with class weights
-    criterion = nn.CrossEntropyLoss(weight=data['class_weights'].to(device))
+    # Compound Loss Function (as per dissertation)
+    from losses import CompoundLoss
+    criterion = CompoundLoss(
+        alpha_weight=config['loss_alpha'],
+        beta_weight=config['loss_beta']
+    )
+    print(f"Loss: Compound (Focal + Dice) with α={config['loss_alpha']}, β={config['loss_beta']}")
 
     # Optimizer
     optimizer = optim.AdamW(
