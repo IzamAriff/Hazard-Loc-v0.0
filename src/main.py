@@ -225,8 +225,8 @@ def main():
 
     # Run with options
     pipeline.run_complete_pipeline(
-        skip_training=True,  # Set to True if model already trained
-        skip_colmap=True     # Set to True if COLMAP already run
+        skip_training=False,  # Set to True if model already trained
+        skip_colmap=False     # Set to True if COLMAP already run
     )
 
 

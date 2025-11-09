@@ -226,8 +226,14 @@ def main():
 
     # Load data
     print(f"\nLoading data from: {DATA_DIR}/processed")
+    processed_data_dir = Path(f"{DATA_DIR}/processed")
+    if not processed_data_dir.exists() or not any(processed_data_dir.iterdir()):
+        print(f"✗ ERROR: Processed data not found at '{processed_data_dir}'")
+        print("  Please run the data preprocessing script first to generate train/val/test splits.")
+        return
+
     data = get_dataloaders(
-        f"{DATA_DIR}/processed",
+        str(processed_data_dir),
         batch_size=config['batch_size'],
         num_workers=config['num_workers']
     )
