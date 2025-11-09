@@ -188,11 +188,19 @@ class HazardLocPipeline:
         print("HAZARDLOC: COMPLETE PIPELINE EXECUTION")
         print("="*70)
 
+        model_path = Path(MODEL_SAVE)
+
         # Step 1: Train model (optional skip if already trained)
-        if not skip_training:
-            self.step1_train_detector()
+        if skip_training:
+            if not model_path.exists():
+                print(f"⚠  WARNING: 'skip_training' is True, but model not found at '{model_path}'.")
+                print("           Training is required. Forcing training step...")
+                self.step1_train_detector()
+            else:
+                print(f"\nSkipping training (using existing model at '{model_path}')")
         else:
-            print("\nSkipping training (using existing model)")
+            print("\nStarting model training...")
+            self.step1_train_detector()
 
         # Step 2: COLMAP reconstruction (optional skip if already done)
         if not skip_colmap:
