@@ -96,27 +96,32 @@ class HazardLocPipeline:
 
         detections = []
 
-        for img_path in test_images:
-            label, confidence = predict_img(img_path)
+        try:
+            for img_path in test_images:
+                label, confidence = predict_img(img_path)
 
-            if label == 1:  # Hazard detected (assuming 1 = hazard class)
-                # --- IMPROVEMENT ---
-                # Instead of a fixed placeholder, use a bounding box that covers the entire image.
-                # This is a better temporary solution before implementing a real object detector.
-                # We get the image dimensions from the COLMAP camera data later, but for now,
-                # we can read the image to get its size.
-                from PIL import Image
-                with Image.open(img_path) as img:
-                    width, height = img.size
+                if label == 1:  # Hazard detected (assuming 1 = hazard class)
+                    # --- IMPROVEMENT ---
+                    # Instead of a fixed placeholder, use a bounding box that covers the entire image.
+                    # This is a better temporary solution before implementing a real object detector.
+                    # We get the image dimensions from the COLMAP camera data later, but for now,
+                    # we can read the image to get its size.
+                    from PIL import Image
+                    with Image.open(img_path) as img:
+                        width, height = img.size
 
-                detections.append({
-                    'image': img_path.name,
-                    'confidence': confidence,
-                    'bbox': [0, 0, width, height]
-                })
-                print(f"  ✓ Hazard detected in {img_path.name} (confidence: {confidence:.2%})")
-            else:
-                print(f"  - No hazard in {img_path.name}")
+                    detections.append({
+                        'image': img_path.name,
+                        'confidence': confidence,
+                        'bbox': [0, 0, width, height]
+                    })
+                    print(f"  ✓ Hazard detected in {img_path.name} (confidence: {confidence:.2%})")
+                else:
+                    print(f"  - No hazard in {img_path.name}")
+        except FileNotFoundError as e:
+            print(f"\n✗ ERROR: {e}")
+            print("  Cannot run hazard detection. Halting pipeline.")
+            return None
 
         print(f"\nTotal hazards detected: {len(detections)}")
         return detections
@@ -201,6 +206,9 @@ class HazardLocPipeline:
         # Step 3: Detect hazards
         test_images = list(Path(COLMAP_IMG).glob("*.jpg"))  # Process all images
         detections = self.step3_detect_hazards(test_images)
+        if detections is None: # Check if detection step failed
+            print("\nHalting pipeline due to error in hazard detection step.")
+            return
 
         # Step 4: Localize in 3D
         if len(detections) > 0:
