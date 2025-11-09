@@ -163,6 +163,9 @@ class HazardTrainer:
                 self.best_val_loss = val_loss
                 self.patience_counter = 0
 
+                # Ensure the directory for saving the model exists
+                Path(MODEL_SAVE).parent.mkdir(parents=True, exist_ok=True)
+
                 # Save best model
                 torch.save({
                     'epoch': epoch,
@@ -180,6 +183,17 @@ class HazardTrainer:
                     print(f"\nEarly stopping triggered after {epoch+1} epochs")
                     break
 
+        # --- Ensure a model is always saved at the end of training ---
+        # If no improvement was ever made, the model might not have been saved.
+        # Save the final state of the model regardless.
+        if not Path(MODEL_SAVE).exists() or self.best_val_loss == float('inf'):
+            Path(MODEL_SAVE).parent.mkdir(parents=True, exist_ok=True)
+            torch.save({
+                'epoch': epochs - 1, # Or the last actual epoch if early stopped
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, MODEL_SAVE)
+            print(f"\n✓ Final model state saved to: {MODEL_SAVE} (no improvement during training or initial save)")
         # Save training history
         history_path = Path(MODEL_SAVE).parent / 'training_history.json'
         with open(history_path, 'w') as f:
