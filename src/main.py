@@ -108,7 +108,7 @@ class HazardLocPipeline:
             # For TPUs, scale the learning rate by the number of cores.
             # This compensates for the larger effective batch size.
             import torch_xla.core.xla_model as xm
-            num_cores = xm.xla_world_size()
+            num_cores = xm.xrt_world_size()
             learning_rate *= num_cores
             print(f"✓ TPU detected. Scaling learning rate by {num_cores} cores to: {learning_rate:.1e}")
 
