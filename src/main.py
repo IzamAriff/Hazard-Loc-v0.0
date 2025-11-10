@@ -12,6 +12,7 @@ import importlib
 # Import all modules
 from src.data.dataloader import get_dataloaders
 from src.data.downloader import download_from_kaggle
+from src.data.preprocess import create_processed_dataset
 from src.models.hazard_cnn import HazardCNN
 from src.train import HazardTrainer
 from src.utils.colmap_utils import COLMAPAdapter, read_colmap_outputs
@@ -53,6 +54,24 @@ class HazardLocPipeline:
         success = download_from_kaggle(KAGGLE_DATASET_SLUG, str(raw_data_dir), force=force_download)
         if not success:
             print("\n✗ Halting pipeline due to data download failure.")
+        return success
+
+    def step0_5_preprocess_data(self, force_preprocess=False):
+        """
+        Step 0.5: Preprocess raw data into train/val splits.
+        """
+        print("\n" + "="*70)
+        print("STEP 0.5: PREPROCESSING RAW DATA")
+        print("="*70)
+
+        raw_data_dir = Path(DATA_DIR) / "raw"
+        processed_data_dir = Path(DATA_DIR) / "processed"
+
+        success = create_processed_dataset(str(raw_data_dir), str(processed_data_dir), force=force_preprocess)
+
+        if not success:
+            print("\n✗ Halting pipeline due to data preprocessing failure.")
+
         return success
 
     def step1_train_detector(self, config=None):
@@ -200,7 +219,7 @@ class HazardLocPipeline:
         print("\nLaunching interactive 3D viewer...")
         self.visualizer.visualize()
 
-    def run_complete_pipeline(self, skip_data_prep=False, skip_training=False, skip_colmap=False):
+    def run_complete_pipeline(self, skip_data_prep=False, skip_preprocessing=False, skip_training=False, skip_colmap=False):
         """
         Execute complete HazardLoc pipeline
         """
@@ -214,6 +233,13 @@ class HazardLocPipeline:
                 return # Stop if data prep fails
         else:
             print("\nSkipping data preparation (assuming data already exists)")
+
+        # Step 0.5: Preprocess data
+        if not skip_preprocessing:
+            if not self.step0_5_preprocess_data():
+                return # Stop if preprocessing fails
+        else:
+            print("\nSkipping data preprocessing (assuming data is already processed)")
 
         model_path = Path(MODEL_SAVE)
 
@@ -268,7 +294,8 @@ def main():
 
     # Run with options
     pipeline.run_complete_pipeline(
-        skip_data_prep=False, # Set to True to skip downloading from Kaggle
+        skip_data_prep=False,  # Set to True to skip downloading from Kaggle
+        skip_preprocessing=False, # Set to True to skip splitting data into train/val
         skip_training=True,  # Set to True if model already trained
         skip_colmap=True     # Set to True if COLMAP already run
     )
