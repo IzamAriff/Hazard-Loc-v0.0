@@ -31,7 +31,17 @@ class HazardLocPipeline:
     """
 
     def __init__(self):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # --- MODIFICATION: Add TPU device detection ---
+        try:
+            import torch_xla.core.xla_model as xm
+            self.device = xm.xla_device()
+            print(f"✓ TPU device found: {xm.xla_real_devices([str(self.device)])[0]}")
+        except ImportError:
+            print("torch_xla not found, defaulting to CUDA/CPU.")
+            self.device = torch.device('cuda'if torch.cuda.is_available() else 'cpu')
+        
+        print(f"Using device: {self.device}")
+        
         self.model = None
         self.colmap = None
         self.localizer = None

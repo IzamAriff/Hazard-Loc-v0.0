@@ -29,15 +29,23 @@ class HazardTrainer:
         self.device = device
         self.config = config
 
+        # --- MODIFICATION: Check if we are on a TPU device ---
+        self.is_tpu = 'xla' in str(self.device)
+        if self.is_tpu:
+            import torch_xla.core.xla_model as xm
+            self.xm = xm
+
         # BF16 Mixed Precision Setup (as per dissertation Section 3.4.3.3)
         self.use_bf16 = config.get('use_bf16', True) and torch.cuda.is_available()
         
         if self.use_bf16:
             # Check if GPU supports BF16
-            if torch.cuda.get_device_capability()[0] >= 8:  # Ampere or newer
+            # --- MODIFICATION: TPUs have native BF16 support ---
+            if self.is_tpu or (torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8):  # Ampere or newer
                 self.dtype = torch.bfloat16
-                print("✓ BF16 mixed precision enabled (native GPU support)")
+                print(f"✓ BF16 mixed precision enabled (native {'TPU' if self.is_tpu else 'GPU'} support)")
             else:
+                # Fallback for older GPUs
                 print("⚠ GPU does not support BF16, falling back to FP16")
                 self.dtype = torch.float16
         else:
@@ -68,15 +76,20 @@ class HazardTrainer:
             optimizer.zero_grad()
 
             # BF16/FP16 Mixed Precision Forward Pass
-            with autocast(device_type='cuda', dtype=self.dtype, enabled=self.use_bf16):
+            # --- MODIFICATION: Use 'xla' device type for autocast on TPU ---
+            device_type = 'xla' if self.is_tpu else 'cuda'
+            with autocast(device_type=device_type, dtype=self.dtype, enabled=self.use_bf16):
                 outputs = self.model(images)
                 loss = criterion(outputs, labels)
             
             # Backward pass with proper scaling
-            if self.scaler:  # Only for FP16
+            if self.scaler:  # FP16 on GPU
                 self.scaler.scale(loss).backward()
                 self.scaler.step(optimizer)
                 self.scaler.update()
+            elif self.is_tpu: # TPU
+                loss.backward()
+                self.xm.optimizer_step(optimizer) # Use XLA optimizer step
             else:  # BF16 or FP32 - no scaling needed
                 loss.backward()
                 optimizer.step()
@@ -128,6 +141,12 @@ class HazardTrainer:
         epochs = self.config.get('epochs', 50)
         patience = self.config.get('patience', 10)
 
+        # --- MODIFICATION: Wrap dataloaders for TPU ---
+        if self.is_tpu:
+            from torch_xla.distributed.parallel_loader import MpDeviceLoader
+            train_loader = MpDeviceLoader(train_loader, self.device)
+            val_loader = MpDeviceLoader(val_loader, self.device)
+
         print(f"\nStarting training for {epochs} epochs...")
         print(f"Device: {self.device}")
         print(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
@@ -166,14 +185,19 @@ class HazardTrainer:
                 # Ensure the directory for saving the model exists
                 Path(MODEL_SAVE).parent.mkdir(parents=True, exist_ok=True)
 
-                # Save best model
-                torch.save({
+                # --- MODIFICATION: Use xm.save for TPU, torch.save otherwise ---
+                checkpoint = {
                     'epoch': epoch,
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'val_loss': val_loss,
                     'val_metrics': val_metrics,
-                }, MODEL_SAVE)
+                }
+                if self.is_tpu:
+                    # xm.save is recommended for TPU to correctly handle model state
+                    self.xm.save(checkpoint, MODEL_SAVE)
+                else:
+                    torch.save(checkpoint, MODEL_SAVE)
                 print(f"✓ Model saved (val_loss improved to {val_loss:.4f})")
             else:
                 self.patience_counter += 1
@@ -188,11 +212,15 @@ class HazardTrainer:
         # Save the final state of the model regardless.
         if not Path(MODEL_SAVE).exists() or self.best_val_loss == float('inf'):
             Path(MODEL_SAVE).parent.mkdir(parents=True, exist_ok=True)
-            torch.save({
+            final_checkpoint = {
                 'epoch': epochs - 1, # Or the last actual epoch if early stopped
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-            }, MODEL_SAVE)
+            }
+            if self.is_tpu:
+                self.xm.save(final_checkpoint, MODEL_SAVE)
+            else:
+                torch.save(final_checkpoint, MODEL_SAVE)
             print(f"\n✓ Final model state saved to: {MODEL_SAVE} (no improvement during training or initial save)")
         # Save training history
         history_path = Path(MODEL_SAVE).parent / 'training_history.json'
