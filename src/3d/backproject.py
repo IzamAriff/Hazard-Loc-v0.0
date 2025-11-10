@@ -121,7 +121,7 @@ class HazardLocalizer:
 
         # Normalize to get pixel coordinates
         # Avoid division by zero for points at infinity
-        valid_idx = np.where(points_2d_homogeneous[:, 2] != 0)
+        valid_idx = np.where(points_2d_homogeneous[:, 2] != 0) 
         points_2d = points_2d_homogeneous[valid_idx]
         points_2d[:, 0] /= points_2d[:, 2]
         points_2d[:, 1] /= points_2d[:, 2]

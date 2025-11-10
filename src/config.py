@@ -3,6 +3,7 @@
 import os
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+KAGGLE_DATASET_SLUG = "aniruddhsharma/structural-defects-network-concrete-crack-images"  
 
 DATA_DIR      = os.path.join(PROJECT_ROOT, "data")
 MODEL_SAVE    = os.path.join(PROJECT_ROOT, "results", "hazard_cnn.pth")

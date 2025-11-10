@@ -11,6 +11,7 @@ import importlib
 
 # Import all modules
 from src.data.dataloader import get_dataloaders
+from src.data.downloader import download_from_kaggle
 from src.models.hazard_cnn import HazardCNN
 from src.train import HazardTrainer
 from src.utils.colmap_utils import COLMAPAdapter, read_colmap_outputs
@@ -20,7 +21,7 @@ HazardLocalizer = backproject_module.HazardLocalizer
 open3d_viz_module = importlib.import_module("src.3d.open3d_viz")
 HazardVisualizer = open3d_viz_module.HazardVisualizer
 from src.detect import predict_img
-from src.config import DATA_DIR, MODEL_SAVE, COLMAP_IMG, COLMAP_OUT, VISUAL_DIR
+from src.config import DATA_DIR, MODEL_SAVE, COLMAP_IMG, COLMAP_OUT, VISUAL_DIR, KAGGLE_DATASET_SLUG
 
 
 class HazardLocPipeline:
@@ -34,6 +35,25 @@ class HazardLocPipeline:
         self.colmap = None
         self.localizer = None
         self.visualizer = None
+
+    def step0_prepare_data(self, force_download=False):
+        """
+        Step 0: Download and prepare data from Kaggle
+        """
+        print("\n" + "="*70)
+        print("STEP 0: PREPARING DATASET FROM KAGGLE")
+        print("="*70)
+
+        # The raw data will be downloaded here, preserving Kaggle's folder structure.
+        # Your dataloader expects data in DATA_DIR/processed, so you might have a
+        # separate script to process the raw data into the processed format.
+        # For now, we just download it to DATA_DIR/raw.
+        raw_data_dir = Path(DATA_DIR) / "raw"
+
+        success = download_from_kaggle(KAGGLE_DATASET_SLUG, str(raw_data_dir), force=force_download)
+        if not success:
+            print("\n✗ Halting pipeline due to data download failure.")
+        return success
 
     def step1_train_detector(self, config=None):
         """
@@ -180,13 +200,20 @@ class HazardLocPipeline:
         print("\nLaunching interactive 3D viewer...")
         self.visualizer.visualize()
 
-    def run_complete_pipeline(self, skip_training=False, skip_colmap=False):
+    def run_complete_pipeline(self, skip_data_prep=False, skip_training=False, skip_colmap=False):
         """
         Execute complete HazardLoc pipeline
         """
         print("\n" + "="*70)
         print("HAZARDLOC: COMPLETE PIPELINE EXECUTION")
         print("="*70)
+
+        # Step 0: Prepare data from Kaggle
+        if not skip_data_prep:
+            if not self.step0_prepare_data():
+                return # Stop if data prep fails
+        else:
+            print("\nSkipping data preparation (assuming data already exists)")
 
         model_path = Path(MODEL_SAVE)
 
@@ -241,8 +268,9 @@ def main():
 
     # Run with options
     pipeline.run_complete_pipeline(
-        skip_training=False,  # Set to True if model already trained
-        skip_colmap=False     # Set to True if COLMAP already run
+        skip_data_prep=False, # Set to True to skip downloading from Kaggle
+        skip_training=True,  # Set to True if model already trained
+        skip_colmap=True     # Set to True if COLMAP already run
     )
 
 

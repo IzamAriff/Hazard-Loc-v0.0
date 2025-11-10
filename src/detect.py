@@ -31,7 +31,10 @@ def _initialize_model():
         )
 
     _model = HazardCNN(num_classes=2)  # Assuming 2 classes: hazard, no-hazard
-    checkpoint = torch.load(model_path, map_location=_device)
+    # Set weights_only=False because the checkpoint includes optimizer state and metrics
+    # which may contain non-tensor data like numpy arrays. This is safe as we are
+    # loading a model we trained ourselves.
+    checkpoint = torch.load(model_path, map_location=_device, weights_only=False)
     _model.load_state_dict(checkpoint['model_state_dict'])
     _model = _model.to(_device).eval()
 
