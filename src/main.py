@@ -296,8 +296,8 @@ def main():
     pipeline.run_complete_pipeline(
         skip_data_prep=False,  # Set to True to skip downloading from Kaggle
         skip_preprocessing=False, # Set to True to skip splitting data into train/val
-        skip_training=True,  # Set to True if model already trained
-        skip_colmap=True     # Set to True if COLMAP already run
+        skip_training=False,  # Set to True if model already trained
+        skip_colmap=False     # Set to True if COLMAP already run
     )
 
 
