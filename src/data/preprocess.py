@@ -10,10 +10,11 @@ import os
 import shutil
 import random
 from pathlib import Path
+from collections import defaultdict
 
 def create_processed_dataset(raw_dir: str, processed_dir: str, val_split: float = 0.2, force: bool = False):
     """
-    Splits raw image data into training and validation sets.
+    Splits raw image data into training and validation sets, handling nested directories.
 
     Args:
         raw_dir (str): Path to the raw data directory containing class folders.
@@ -36,32 +37,42 @@ def create_processed_dataset(raw_dir: str, processed_dir: str, val_split: float 
         return True
 
     print(f"Creating processed dataset at: {processed_path}")
-    processed_path.mkdir(parents=True, exist_ok=True)
 
-    # Assuming class names are the folder names in the raw directory
-    class_names = [d.name for d in raw_path.iterdir() if d.is_dir()]
-    if not class_names:
-        print(f"✗ ERROR: No class folders found in '{raw_dir}'.")
+    # --- ROBUST LOGIC to handle nested directories like 'Decks/Cracked' ---
+    images_by_class = defaultdict(list)
+    print("Scanning for images in subdirectories...")
+
+    # Recursively find all .jpg images. This is robust to various folder structures.
+    all_images = list(raw_path.glob('**/*.jpg'))
+    if not all_images:
+        print(f"✗ ERROR: No '.jpg' images found recursively in '{raw_dir}'. Please check the dataset contents.")
         return False
+
+    for img_path in all_images:
+        # The immediate parent folder's name is the class (e.g., 'Cracked', 'Non-cracked')
+        class_name = img_path.parent.name
+        images_by_class[class_name].append(img_path)
+
+    class_names = sorted(list(images_by_class.keys()))
+    print(f"Found classes: {class_names}")
 
     for class_name in class_names:
         # Create train and val directories for each class
         (processed_path / 'train' / class_name).mkdir(parents=True, exist_ok=True)
         (processed_path / 'val' / class_name).mkdir(parents=True, exist_ok=True)
 
-        # Get all image files for the class
-        images = list((raw_path / class_name).glob('*'))
+        # Get all image files for the class and shuffle them
+        images = images_by_class[class_name]
         random.shuffle(images)
 
-        # Split files
+        # Split files into training and validation sets
         split_idx = int(len(images) * val_split)
         val_images = images[:split_idx]
         train_images = images[split_idx:]
 
-        # Copy files to new directories
+        # Copy files to the new 'processed' directories
         for img_path in train_images:
             shutil.copy(img_path, processed_path / 'train' / class_name / img_path.name)
-
         for img_path in val_images:
             shutil.copy(img_path, processed_path / 'val' / class_name / img_path.name)
 
