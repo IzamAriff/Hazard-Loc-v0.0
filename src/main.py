@@ -94,11 +94,23 @@ class HazardLocPipeline:
 
         if config is None:
             config = {
-                'epochs': 30,
-                'batch_size': 32,
+                'epochs': 50,
+                'batch_size': 64, # Increased default batch size
                 'learning_rate': 1e-3,
-                'patience': 5
+                'patience': 10,
+                'use_bf16': True,
             }
+
+        # --- IMPROVEMENT: Automatic Learning Rate Scaling for TPU ---
+        learning_rate = config['learning_rate']
+        is_tpu = 'xla' in str(self.device)
+        if is_tpu:
+            # For TPUs, scale the learning rate by the number of cores.
+            # This compensates for the larger effective batch size.
+            import torch_xla.core.xla_model as xm
+            num_cores = xm.xla_world_size()
+            learning_rate *= num_cores
+            print(f"✓ TPU detected. Scaling learning rate by {num_cores} cores to: {learning_rate:.1e}")
 
         # Load data
         data = get_dataloaders(f"{DATA_DIR}/processed", batch_size=config['batch_size'])
@@ -108,7 +120,7 @@ class HazardLocPipeline:
         self.model = HazardCNN(num_classes=num_classes)
 
         criterion = torch.nn.CrossEntropyLoss(weight=data['class_weights'].to(self.device))
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=config['learning_rate'])
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
 
         trainer = HazardTrainer(self.model, self.device, config)
