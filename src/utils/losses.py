@@ -20,37 +20,54 @@ class FocalLoss(nn.Module):
         self.reduction = reduction
     
     def forward(self, inputs, targets):
-        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
-        pt = torch.exp(-BCE_loss)
-        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+        # --- FIX: Numerically stable implementation for multi-class Focal Loss ---
+        # Get the log probabilities from the model's logits
+        log_prob = F.log_softmax(inputs, dim=-1)
+        
+        # Gather the log probabilities of the ground truth classes
+        log_pt = log_prob.gather(1, targets.view(-1, 1)).view(-1)
+        
+        # Convert log probabilities to probabilities
+        pt = log_pt.exp()
+        
+        # The focal loss formula
+        # The -log_pt is equivalent to the cross-entropy loss for that sample
+        focal_loss = -self.alpha * (1 - pt) ** self.gamma * log_pt
         
         if self.reduction == 'mean':
-            return F_loss.mean()
+            return focal_loss.mean()
         elif self.reduction == 'sum':
-            return F_loss.sum()
-        else:
-            return F_loss
+            return focal_loss.sum()
 
 
 class DiceLoss(nn.Module):
     """
     Dice Loss for optimizing IoU directly
     """
-    def __init__(self, smooth=1.0):
+    def __init__(self, smooth=1.0, from_logits=True):
         super().__init__()
         self.smooth = smooth
+        self.from_logits = from_logits
     
     def forward(self, inputs, targets):
-        inputs = torch.sigmoid(inputs)
+        # --- FIX: Use softmax for multi-class problems ---
+        if self.from_logits:
+            # Get probabilities from logits
+            inputs = F.softmax(inputs, dim=1)
         
-        # Flatten tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
+        # --- FIX: Correct Dice score for multi-class classification ---
+        # Do not flatten all dimensions. We want to compare class predictions.
+        num_classes = inputs.shape[1]
+        targets_one_hot = F.one_hot(targets, num_classes=num_classes)
         
-        intersection = (inputs * targets).sum()
-        dice = (2. * intersection + self.smooth) / (inputs.sum() + targets.sum() + self.smooth)
+        # Sum over the batch dimension (dim=0) for a per-class score
+        intersection = (inputs * targets_one_hot).sum(dim=0)
+        union = inputs.sum(dim=0) + targets_one_hot.sum(dim=0)
         
-        return 1 - dice
+        # Calculate the Dice score per class, then average
+        dice_per_class = (2. * intersection + self.smooth) / (union + self.smooth)
+        
+        return 1.0 - dice_per_class.mean()
 
 
 class CompoundLoss(nn.Module):
@@ -66,9 +83,10 @@ class CompoundLoss(nn.Module):
         self.beta_weight = beta_weight    # Weight for Dice Loss
         
         self.focal_loss = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
-        self.dice_loss = DiceLoss()
+        self.dice_loss = DiceLoss(from_logits=True) # Ensure DiceLoss knows it's getting logits
     
     def forward(self, inputs, targets):
+        # Both loss functions now correctly handle logits and integer targets
         focal = self.focal_loss(inputs, targets)
         dice = self.dice_loss(inputs, targets)
         

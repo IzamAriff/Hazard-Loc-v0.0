@@ -80,7 +80,14 @@ class HazardTrainer:
             device_type = 'xla' if self.is_tpu else 'cuda'
             with autocast(device_type=device_type, dtype=self.dtype, enabled=self.use_bf16):
                 outputs = self.model(images)
-                loss = criterion(outputs, labels)
+                # --- FIX: Unpack the tuple from CompoundLoss ---
+                # Check if the criterion returns a tuple (our custom loss)
+                loss_output = criterion(outputs, labels)
+                if isinstance(loss_output, tuple):
+                    loss, loss_components = loss_output
+                else:
+                    loss = loss_output # Standard loss function
+                    loss_components = {}
             
             # Backward pass with proper scaling
             if self.scaler:  # FP16 on GPU
@@ -123,7 +130,12 @@ class HazardTrainer:
                 images, labels = images.to(self.device), labels.to(self.device)
 
                 outputs = self.model(images)
-                loss = criterion(outputs, labels)
+                # --- FIX: Unpack the tuple from CompoundLoss ---
+                loss_output = criterion(outputs, labels)
+                if isinstance(loss_output, tuple):
+                    loss, _ = loss_output
+                else:
+                    loss = loss_output
 
                 running_loss += loss.item()
                 _, predicted = outputs.max(1)
@@ -285,13 +297,12 @@ def main():
     model = HazardCNN(num_classes=num_classes)
     print(f"\nModel: HazardCNN with {num_classes} classes")
 
-    # Compound Loss Function (as per dissertation)
-    from losses import CompoundLoss
-    criterion = CompoundLoss(
-        alpha_weight=config['loss_alpha'],
-        beta_weight=config['loss_beta']
-    )
-    print(f"Loss: Compound (Focal + Dice) with α={config['loss_alpha']}, β={config['loss_beta']}")
+    # Revert to CrossEntropyLoss with class weights for stability
+    criterion = nn.CrossEntropyLoss(weight=data['class_weights'].to(device))
+    print(f"Loss: CrossEntropyLoss with class weights: {data['class_weights'].cpu().numpy().tolist()}")
+    # Remove loss weights from config as they are no longer used
+    config.pop('loss_alpha', None)
+    config.pop('loss_beta', None)
 
     # Optimizer
     optimizer = optim.AdamW(
