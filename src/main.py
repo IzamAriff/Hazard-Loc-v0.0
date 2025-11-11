@@ -13,6 +13,7 @@ import importlib
 from src.data.dataloader import get_dataloaders
 from src.data.downloader import download_from_kaggle
 from src.data.preprocess import create_processed_dataset
+from src.utils.losses import CompoundLoss # Import CompoundLoss
 from src.models.hazard_cnn import HazardCNN
 from src.train import HazardTrainer
 from src.utils.colmap_utils import COLMAPAdapter, read_colmap_outputs
@@ -95,10 +96,14 @@ class HazardLocPipeline:
         if config is None:
             config = {
                 'epochs': 50,
-                'batch_size': 64, # Increased default batch size
+                'batch_size': 32, # Align with train.py for stability
                 'learning_rate': 1e-3,
-                'patience': 10,
-                'use_bf16': True,
+                'weight_decay': 1e-4, # Align with train.py
+                'patience': 5, # Align with train.py
+                'use_bf16': True, # Equivalent to mixed_precision: True
+                'num_workers': 4, # Align with train.py
+                'loss_alpha': 1.0,  # Focal loss weight
+                'loss_beta': 0.5    # Dice loss weight
             }
 
         # --- IMPROVEMENT: Automatic Learning Rate Scaling for TPU ---
@@ -124,14 +129,22 @@ class HazardLocPipeline:
             print(f"✓ TPU detected. Scaling learning rate by {num_cores} cores to: {learning_rate:.1e}")
 
         # Load data
-        data = get_dataloaders(f"{DATA_DIR}/processed", batch_size=config['batch_size'])
+        data = get_dataloaders(f"{DATA_DIR}/processed", batch_size=config['batch_size'], num_workers=config['num_workers'])
 
         # Create and train model
         num_classes = len(data['class_names'])
         self.model = HazardCNN(num_classes=num_classes)
 
-        criterion = torch.nn.CrossEntropyLoss(weight=data['class_weights'].to(self.device))
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+        # Compound Loss Function (as per dissertation)
+        criterion = CompoundLoss(
+            alpha_weight=config['loss_alpha'],
+            beta_weight=config['loss_beta']
+        )
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=learning_rate,
+            weight_decay=config['weight_decay'] # Use weight_decay from config
+        )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
 
         trainer = HazardTrainer(self.model, self.device, config)

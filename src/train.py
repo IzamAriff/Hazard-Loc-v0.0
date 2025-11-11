@@ -15,6 +15,7 @@ from datetime import datetime
 from src.data.dataloader import get_dataloaders
 from src.models.hazard_cnn import HazardCNN
 from src.utils.metrics import compute_metrics
+from src.utils.losses import CompoundLoss # Import CompoundLoss
 from src.utils.logger import TrainingLogger
 from src.config import DATA_DIR, MODEL_SAVE, PROJECT_ROOT
 
@@ -297,12 +298,12 @@ def main():
     model = HazardCNN(num_classes=num_classes)
     print(f"\nModel: HazardCNN with {num_classes} classes")
 
-    # Revert to CrossEntropyLoss with class weights for stability
-    criterion = nn.CrossEntropyLoss(weight=data['class_weights'].to(device))
-    print(f"Loss: CrossEntropyLoss with class weights: {data['class_weights'].cpu().numpy().tolist()}")
-    # Remove loss weights from config as they are no longer used
-    config.pop('loss_alpha', None)
-    config.pop('loss_beta', None)
+    # Compound Loss Function (as per dissertation)
+    criterion = CompoundLoss(
+        alpha_weight=config['loss_alpha'],
+        beta_weight=config['loss_beta']
+    )
+    print(f"Loss: Compound (Focal + Dice) with α={config['loss_alpha']}, β={config['loss_beta']}")
 
     # Optimizer
     optimizer = optim.AdamW(
