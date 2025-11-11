@@ -269,8 +269,16 @@ def main():
     print(f"Configuration: {json.dumps(config, indent=2)}")
 
     # Device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"\nUsing device: {device}")
+    # --- IMPROVEMENT: Centralized TPU/GPU/CPU device detection ---
+    try:
+        import torch_xla.core.xla_model as xm
+        device = xm.xla_device()
+        print(f"\n✓ TPU device found: {xm.xla_real_devices([str(device)])[0]}")
+    except ImportError:
+        print("\n`torch_xla` not found, checking for CUDA/CPU.")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    print(f"Using device: {device}")
 
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
