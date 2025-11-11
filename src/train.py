@@ -179,11 +179,7 @@ class HazardTrainer:
             if scheduler:
                 scheduler.step(val_loss)
 
-            # Log results
-            print(f"\nTrain Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
-            print(f"Val Loss: {val_loss:.4f} | Val Acc: {val_metrics['accuracy']:.2f}%")
-            print(f"Val Precision: {val_metrics['precision']:.4f} | Val Recall: {val_metrics['recall']:.4f}")
-            print(f"Val F1: {val_metrics['f1']:.4f}")
+            self.logger.log_epoch(epoch + 1, train_loss, val_loss, val_metrics)
 
             # Save history
             self.history['train_loss'].append(train_loss)
@@ -244,6 +240,9 @@ class HazardTrainer:
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Model saved to: {MODEL_SAVE}")
 
+        # Close the logger
+        self.logger.close()
+
         return self.history
 
 
@@ -256,7 +255,7 @@ def main():
         'batch_size': 32,
         'learning_rate': 1e-3,
         'weight_decay': 1e-4,
-        'patience': 5,
+        'patience': 10,
         'mixed_precision': True,
         'num_workers': 4,
         'loss_alpha': 1.0,  # Focal loss weight
@@ -266,7 +265,6 @@ def main():
     print("="*60)
     print("HAZARDLOC MODEL TRAINING")
     print("="*60)
-    print(f"Configuration: {json.dumps(config, indent=2)}")
 
     # Device
     # --- IMPROVEMENT: Centralized TPU/GPU/CPU device detection ---
@@ -339,6 +337,9 @@ def main():
         criterion,
         scheduler
     )
+
+    # Log the final configuration to the logger
+    trainer.logger.log_config(config)
 
     print("\n" + "="*60)
     print("Training completed successfully!")

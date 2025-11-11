@@ -99,7 +99,7 @@ class HazardLocPipeline:
                 'batch_size': 32, # Align with train.py for stability
                 'learning_rate': 1e-3,
                 'weight_decay': 1e-4, # Align with train.py
-                'patience': 5, # Align with train.py
+                'patience': 10, # Align with train.py
                 'use_bf16': True, # Equivalent to mixed_precision: True
                 'num_workers': 4, # Align with train.py
                 'loss_alpha': 1.0,  # Focal loss weight
