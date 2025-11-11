@@ -257,7 +257,7 @@ def main():
         'weight_decay': 1e-4,
         'patience': 10,
         'mixed_precision': True,
-        'num_workers': 4,
+        'num_workers': 2,
         'loss_alpha': 1.0,  # Focal loss weight
         'loss_beta': 0.5    # Dice loss weight
     }

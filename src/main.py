@@ -101,7 +101,7 @@ class HazardLocPipeline:
                 'weight_decay': 1e-4, # Align with train.py
                 'patience': 10, # Align with train.py
                 'use_bf16': True, # Equivalent to mixed_precision: True
-                'num_workers': 4, # Align with train.py
+                'num_workers': 2, # Align with train.py
                 'loss_alpha': 1.0,  # Focal loss weight
                 'loss_beta': 0.5    # Dice loss weight
             }
