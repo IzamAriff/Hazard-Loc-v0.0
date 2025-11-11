@@ -37,7 +37,7 @@ class HazardTrainer:
             self.xm = xm
 
         # BF16 Mixed Precision Setup (as per dissertation Section 3.4.3.3)
-        self.use_bf16 = config.get('use_bf16', True) and torch.cuda.is_available()
+        self.use_bf16 = config.get('use_bf16', True) and self.device.type == 'cuda'
         
         if self.use_bf16:
             # Check if GPU supports BF16
