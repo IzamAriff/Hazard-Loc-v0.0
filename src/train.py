@@ -255,7 +255,7 @@ def main():
         'batch_size': 32,
         'learning_rate': 1e-3,
         'weight_decay': 1e-4,
-        'patience': 10,
+        'patience': 15,
         'mixed_precision': True,
         'num_workers': 2,
         'loss_alpha': 1.0,  # Focal loss weight
