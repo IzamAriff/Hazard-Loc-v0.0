@@ -137,7 +137,7 @@ def run_model_test():
 
         # --- CRITICAL FIX: Create data subsets INSIDE the loop ---
         # This ensures that each model test uses a new, independent random subset of data.
-        subset_fraction = 0.1
+        subset_fraction = 0.3
         original_train_dataset = data_loaders['train'].dataset
         original_val_dataset = data_loaders['val'].dataset
 
