@@ -6,8 +6,8 @@ Comprehensive evaluation metrics for classification
 
 import numpy as np
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, 
-    f1_score, confusion_matrix, classification_report,
+    accuracy_score, precision_score, recall_score,
+    f1_score, confusion_matrix, classification_report, jaccard_score,
     roc_auc_score, average_precision_score
 )
 import matplotlib.pyplot as plt
@@ -55,6 +55,7 @@ def compute_metrics(y_true, y_pred, y_prob=None, class_names=None):
         'precision': precision_score(y_true, y_pred, average='weighted', zero_division=0),
         'recall': weighted_recall,
         'f1': f1_score(y_true, y_pred, average='weighted', zero_division=0),
+        'iou': jaccard_score(y_true, y_pred, average='weighted', zero_division=0),
     }
 
     # Add macro-averaged recall for a different perspective on class balance
@@ -161,6 +162,7 @@ def print_metrics_report(metrics, class_names=None):
     print(f"Precision: {metrics['precision']:.4f}")
     print(f"Recall (Weighted): {metrics['recall']:.4f}")
     print(f"Macro Recall: {metrics.get('macro_recall', 'N/A'):.4f}") # Use .get for safe access
+    print(f"IoU (Jaccard): {metrics.get('iou', 'N/A'):.4f}")
     print(f"F1 Score:  {metrics['f1']:.4f}")
     if 'roc_auc' in metrics:
         print(f"ROC AUC:   {metrics['roc_auc']:.4f}")

@@ -70,7 +70,7 @@ def run_model_test():
 
     # --- Configuration for testing ---
     test_config = {
-        'epochs': 3,
+        'epochs': 1,
         'batch_size': 16,
         'learning_rate': 1e-3,
         'weight_decay': 1e-4,
@@ -137,7 +137,7 @@ def run_model_test():
 
         # --- CRITICAL FIX: Create data subsets INSIDE the loop ---
         # This ensures that each model test uses a new, independent random subset of data.
-        subset_fraction = 0.3
+        subset_fraction = 0.1
         original_train_dataset = data_loaders['train'].dataset
         original_val_dataset = data_loaders['val'].dataset
 
@@ -191,6 +191,7 @@ def run_model_test():
             'recall': history['val_recall'][-1],
             'macro_recall': history['val_macro_recall'][-1],
             'accuracy': history['val_acc'][-1],
+            'iou': history['val_iou'][-1],
             'precision': history['val_precision'][-1],
             'roc_auc': history['val_roc_auc'][-1]
         }
@@ -203,6 +204,7 @@ def run_model_test():
             "Recall (Weighted)": final_val_metrics['recall'],
             "Macro Recall": final_val_metrics['macro_recall'],
             "ROC AUC": final_val_metrics['roc_auc'],
+            "IoU": final_val_metrics['iou'],
             "Accuracy": final_val_metrics['accuracy'],
             "Loss Function": criterion.__class__.__name__
         })
@@ -210,7 +212,7 @@ def run_model_test():
     # --- Results Summary ---
     results_df = pd.DataFrame(results)
     # Reorder columns for better readability
-    column_order = ["Model", "Accuracy", "ROC AUC", "F1 Score", "Precision", "Recall (Weighted)", "Macro Recall", "Loss Function"]
+    column_order = ["Model", "Accuracy", "ROC AUC", "F1 Score", "IoU", "Precision", "Recall (Weighted)", "Macro Recall", "Loss Function"]
     results_df = results_df[column_order]
     print("\n" + "="*80)
     print("MODEL COMPARISON RESULTS")
@@ -218,7 +220,7 @@ def run_model_test():
     print(results_df.to_string(index=False))
 
     # --- Visualization ---
-    metrics_to_plot = ["Accuracy", "ROC AUC", "F1 Score", "Precision", "Macro Recall"]
+    metrics_to_plot = ["Accuracy", "ROC AUC", "F1 Score", "IoU", "Precision", "Macro Recall"]
     df_melted = results_df.melt(id_vars=['Model'], value_vars=metrics_to_plot, var_name='Metric', value_name='Score')
 
     plt.figure(figsize=(16, 8))

@@ -75,6 +75,7 @@ class HazardTrainer:
             'val_acc': [], 
             'val_f1': [],
             'val_precision': [],
+            'val_iou': [],
             'val_recall': [],
             'val_macro_recall': [],
             'val_roc_auc': []
@@ -218,6 +219,7 @@ class HazardTrainer:
             self.history['val_acc'].append(val_metrics['accuracy'])
             self.history['val_f1'].append(val_metrics['f1'])
             self.history['val_precision'].append(val_metrics['precision'])
+            self.history['val_iou'].append(val_metrics['iou'])
             self.history['val_recall'].append(val_metrics['recall'])
             self.history['val_macro_recall'].append(val_metrics['macro_recall'])
             self.history['val_roc_auc'].append(val_metrics.get('roc_auc', 0.0)) # Use .get for safety
