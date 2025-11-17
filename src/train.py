@@ -279,15 +279,6 @@ class HazardTrainer:
         if save_model:
             print(f"Model saved to: {MODEL_SAVE}")
 
-        # --- MODIFICATION: Add Colab download ---
-        # Automatically download the model file if running in Google Colab
-        try:
-            from google.colab import files
-            print("\nRunning in Google Colab. Triggering model download...")
-            files.download(MODEL_SAVE)
-        except ImportError:
-            pass  # Not in a Colab environment, do nothing.
-
         # Close the logger
         self.logger.close()
 
