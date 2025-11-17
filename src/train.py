@@ -132,7 +132,7 @@ class HazardTrainer:
             running_loss += loss.item()
             all_labels.extend(labels.cpu().numpy())
             _, predicted = outputs.max(1)
-            all_probs.extend(torch.softmax(outputs, dim=1).detach().cpu().numpy())
+            all_probs.extend(torch.softmax(outputs, dim=1).detach().to(torch.float32).cpu().numpy())
             all_preds.extend(predicted.detach().cpu().numpy())
 
             # Update progress bar
@@ -167,7 +167,7 @@ class HazardTrainer:
 
                 # --- FIX: Ensure predicted labels are collected, not raw logits ---
                 _, predicted_labels = outputs.max(1)
-                all_probs.extend(torch.softmax(outputs, dim=1).cpu().numpy())
+                all_probs.extend(torch.softmax(outputs, dim=1).to(torch.float32).cpu().numpy())
                 all_preds.extend(predicted_labels.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
 
