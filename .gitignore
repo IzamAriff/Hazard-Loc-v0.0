@@ -8,6 +8,6 @@ hazardloc/
 data/*
 !data/.gitkeep
 results/*
-!results/.gitkeep
 colmap/database.db
 colmap/output/
+colmap/images
