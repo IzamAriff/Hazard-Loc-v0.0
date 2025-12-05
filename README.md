@@ -4,10 +4,6 @@
 
 ## Quickstart
 
-- Create Conda environment:
-`conda env create -f environment.yml`
-`conda activate hazardloc`
-
 - Place images in `colmap/images/`
   
 - Train/evaluate:  
@@ -17,4 +13,3 @@
 - Run full pipeline:  
 `python src/main.py`
 
-- See [docs/usage_guide.md](docs/usage_guide.md) for full details.
