@@ -1,4 +1,4 @@
-# HazardLoc: Sensor-less AI-Driven 3D Hazard Localization System
+# HazardLoc: Sensor-less 3D Hazard Localization System
 
 **HazardLoc** fuses deep learning (PyTorch CNN), Structure-from-Motion (COLMAP), and 3D visualization (Open3D) to localize hazards from 2D images—no extra sensors needed.
 
